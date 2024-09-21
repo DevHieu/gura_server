@@ -2,11 +2,10 @@ const express = require("express");
 const { MongoClient } = require("mongodb");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const multer = require("multer");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "200mb" }));
 
 //env file
 dotenv.config();
@@ -16,34 +15,19 @@ const MONGOURL = process.env.MONGO_URL;
 //connect mongodb server
 const client = new MongoClient(MONGOURL);
 
-//handle upload and save img file
-const storage = multer.diskStorage({
-  fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype == "image/png" ||
-      file.mimetype == "image/jpg" ||
-      file.mimetype == "image/jpeg"
-    ) {
-      cb(null, true);
-    } else {
-      cb(null, false);
-      return cb(new Error("Only .png, .jpg and .jpeg format allowed!"));
-    }
-  },
-  destination: function (req, file, cb) {
-    return cb(null, "./public/Images");
-  },
-  filename: function (req, file, cb) {
-    nameFile = `${Date.now()}_${file.originalname}`;
-    return cb(null, nameFile);
-  },
-});
-
-const upload = multer({ storage });
+// app.use(bodyParser.json({ limit: "50mb", extended: true }));
+// app.use(
+//   bodyParser.urlencoded({
+//     limit: "50mb",
+//     extended: true,
+//     parameterLimit: 50000,
+//   })
+// );
+app.use(express.json());
 
 const insertData = async (part, content, path, pos) => {
   const database = client.db("DataBase");
-  const insertContent = database.collection("data"); // i don't know why i can call it outside
+  const insertContent = database.collection("data"); // i don't know why i cant call it outside
 
   //I dont know how to do it more cleaner so my code so dirty. But it works
   //handle which data will insert to which array
@@ -97,18 +81,20 @@ const insertData = async (part, content, path, pos) => {
   }
 };
 
-app.post("/upload", upload.single("file"), async (req, res) => {
+app.post("/upload", async (req, res) => {
   insertData(
     req.body.part,
     req.body.content,
-    req.file.filename,
+    req.body.image,
     Number(req.body.position) - 1 //convert string to number
   ).catch(console.dir);
+  console.log("done");
 });
 
 app.get("/getdata", async (req, res) => {
   const database = client.db("DataBase");
   const content = database.collection("data");
+
   const userData = await content.find({});
   if ((await content.countDocuments()) === 0) {
     console.log("No documents found!");
@@ -153,7 +139,3 @@ app.listen(PORT, function (err) {
   if (err) console.log("Error in server setup");
   console.log("Server listening on Port", PORT);
 });
-
-app.use("/img", express.static("public/images"));
-
-// export default app;
