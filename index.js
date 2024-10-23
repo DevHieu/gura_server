@@ -1,10 +1,15 @@
 const express = require("express");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 const dotenv = require("dotenv");
 const cors = require("cors");
 
 const app = express();
-app.use(cors());
+const corsOptions = {
+  origin: "http://localhost:3000",
+  credentials: true, //access-control-allow-credentials:true
+  optionSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "200mb" }));
 
 //env file
@@ -25,7 +30,7 @@ const client = new MongoClient(MONGOURL);
 // );
 app.use(express.json());
 
-const insertData = async (part, content, path, pos) => {
+const insertData = async (id, part, content, path, pos) => {
   const database = client.db("DataBase");
   const insertContent = database.collection("data"); // i don't know why i cant call it outside
 
@@ -37,18 +42,21 @@ const insertData = async (part, content, path, pos) => {
         { _id: 1 },
         {
           $push: {
-            story: { $each: [{ content: content, img: path }], $position: pos },
+            data: {
+              $each: [{ _id: id, content: content, img: path }],
+              $position: pos,
+            },
           },
         }
       );
       break;
     case "description":
       insertContent.updateOne(
-        { _id: 1 },
+        { _id: 2 },
         {
           $push: {
-            description: {
-              $each: [{ content: content, img: path }],
+            data: {
+              $each: [{ _id: id, content: content, img: path }],
               $position: pos,
             },
           },
@@ -57,11 +65,11 @@ const insertData = async (part, content, path, pos) => {
       break;
     case "character":
       insertContent.updateOne(
-        { _id: 1 },
+        { _id: 3 },
         {
           $push: {
-            character: {
-              $each: [{ content: content, img: path }],
+            data: {
+              $each: [{ _id: id, content: content, img: path }],
               $position: pos,
             },
           },
@@ -70,10 +78,13 @@ const insertData = async (part, content, path, pos) => {
       break;
     case "guild":
       insertContent.updateOne(
-        { _id: 1 },
+        { _id: 4 },
         {
           $push: {
-            guild: { $each: [{ content: content, img: path }], $position: pos },
+            data: {
+              $each: [{ _id: id, content: content, img: path }],
+              $position: pos,
+            },
           },
         }
       );
@@ -82,7 +93,9 @@ const insertData = async (part, content, path, pos) => {
 };
 
 app.post("/upload", async (req, res) => {
+  const newObjectId = new ObjectId();
   insertData(
+    newObjectId,
     req.body.part,
     req.body.content,
     req.body.image,
@@ -91,18 +104,40 @@ app.post("/upload", async (req, res) => {
   console.log("done");
 });
 
-app.get("/getdata", async (req, res) => {
+app.get("/getdata/:id", async (req, res) => {
+  const reqId = req.params.id;
+
   const database = client.db("DataBase");
   const content = database.collection("data");
 
-  const userData = await content.find({});
+  const userData = await content.find({ _id: parseInt(reqId) });
+
   if ((await content.countDocuments()) === 0) {
     console.log("No documents found!");
   }
-  // Print returned documents
+  // // Print returned documents
   let data = {};
 
   for await (const doc of userData) {
+    data = doc;
+  }
+  res.send(data);
+});
+
+app.get("/getdetail/:partId/:id", async (req, res) => {
+  const database = client.db("DataBase");
+  const content = database.collection("data");
+  const reqPartId = req.params.partId;
+  const reqId = req.params.id;
+
+  const matchData = await content.aggregate([
+    { $match: { _id: parseInt(reqPartId) } },
+    { $unwind: "$data" },
+    { $match: { "data._id": new ObjectId(reqId) } },
+  ]);
+  let data = {};
+
+  for await (const doc of matchData) {
     data = doc;
   }
 
@@ -111,17 +146,18 @@ app.get("/getdata", async (req, res) => {
 
 //DELETE
 
-// app.delete("/delete", async (req, res) => {
-//   const database = client.db("DataBase");
-//   const deleteContent = database.collection("data");
-//   const part = req.body.part;
-//   const string = toString(req.body.part) + "." + toString(req.body.pos);
+app.delete("/delete", async (req, res) => {
+  const database = client.db("DataBase");
+  const deleteContent = database.collection("data");
+  // const part = req.body.part;
+  // const string = toString(req.body.part) + "." + toString(req.body.pos);
 
-//   await deleteContent.updateOne({ _id: 1 }, { $unset: { string: 1 } });
-//   await deleteContent.updateOne({ _id: 1 }, { $pull: { part: null } });
-// });
+  await deleteContent.updateOne({ _id: 1 }, { $unset: { "description.0": 1 } });
+  await deleteContent.updateOne({ _id: 1 }, { $pull: { description: null } });
+  console.log("done");
+});
 
-//EDIT
+// EDIT
 
 // app.put("/update", async (req, res) => {
 //   const database = client.db("DataBase");
