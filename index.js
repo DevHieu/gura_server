@@ -5,7 +5,7 @@ const cors = require("cors");
 
 const app = express();
 const corsOptions = {
-  origin: "http://localhost:3000",
+  origin: "https://guradian.netlify.app/",
   credentials: true, //access-control-allow-credentials:true
   optionSuccessStatus: 200,
 };
@@ -20,14 +20,6 @@ const MONGOURL = process.env.MONGO_URL;
 //connect mongodb server
 const client = new MongoClient(MONGOURL);
 
-// app.use(bodyParser.json({ limit: "50mb", extended: true }));
-// app.use(
-//   bodyParser.urlencoded({
-//     limit: "50mb",
-//     extended: true,
-//     parameterLimit: 50000,
-//   })
-// );
 app.use(express.json());
 
 const insertData = async (id, part, content, path, pos) => {
